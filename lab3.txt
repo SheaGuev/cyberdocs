@@ -1,0 +1,550 @@
+Scanning and Enumeration
+6COSC019W - Cyber Security
+Dr. Ayman El Hajjar
+Weeks 3/4
+1 Instructions
+STOP and READ
+Before you start your work in the lab you need to setup the lab environment as per the
+instructions in lab1, depending on whether you are using your own machine or working
+in a lab room.
+Below is a summary of the steps you need to do. However you should read the Lab
+Environment Setup if you are stuck on any of those steps.
+1. From inside VirtualBox: Delete all Virtual machines that already to ensure that
+you are starting your labs from a clean state.
+2. Browse to the C:\:VirtualMachines folder.
+3. You should have the .7z ˝les. We need the Kali and the OWASP ˝les.
+ PLEASE DO NOT DELETE THE 7Z FILES.
+ You might ˝nd other 7z ˝les. Please leave them, they are for other modules.
+4. It is however safe to delete folders inside the C:\:VirtualMachines. These are residues
+from previous deployments
+5. Extract the ˝les by right clicking on each and select 7-zip, then selecting Extract
+here.
+6. Add the VMs to VirtualBox.
+7. Double check if the Network settings for the Lab environment are set correctly.
+ If the activity you are doing requires Internet access, then you should be
+on NAT
+ If the activity you are doing requires interacting with OWASP, then you
+should be on "Host Only network"
+8. Make sure you run the studentid script before you start the lab.
+./studentid.sh
+‹ Please download the ˝les from the module repository.
+ Open a terminal
+cd Desktop
+Navigate to Desktop to put all out ˝les.
+git clone https://github.com/a-elhajjar/6cosc019w.git
+Download the module repository. It contains some ˝les that we need for later.
+1
+Scanning and Enumeration 6COSC019W
+DO NOT DELETE
+SAFE to delete
+Figure 1: VirtualMachines folder contents
+VMs IP Reference
+‹ In this lab, the IP addresses for my virtual machines (VMs) are as follows:
+1. OWASP VM: 192.168.56.101
+2. Kali VM: 192.168.56.102
+‹ Your VM IP addresses may di˙er since we are using a DHCP server to allocate IPs
+dynamically.
+‹ Always use the IP addresses from your own lab environment while conducting the activities.
+My IPs are provided as an example.
+‹ When you using Kali VM, we will need to switch from host only Adapter to NAT and vice
+versa depending on the activity we are conducting
+‹ For the OWASP VM, all the activities require us to start the OWASP VM.
+‹ For detailed instructions on the lab environment setup, check the lab document.
+‹ Below is a summary recap of the network settings of the VM for both Host only network or NAT.
+ If probing cwscenario.site - You need
+to be connected to NAT
+ If probing 192.168.56.101 (or your IP)-
+You need to be connected to Host-Only
+adapter.
+ Select Host Only Adapter and you are
+connected to your Host-Only Network.
+ Each time you make a change in the
+network settings, you need to disable and
+enable the interface for changes to apply.
+ You Switch from Host-Only adapter by sudo ifcon˝g eth0 down clicking on settings > Choose Network
+> and you should be able to see the
+adapter.
+Disable the network interface (instead of
+restarting)
+OWASP machine should stay on sudo ifcon˝g eth0 up
+Host-Only adapter. You can use the
+same commands to change to Host-Only
+if you started the machine while on NAT!
+Enable the network interface (instead of
+restarting)
+sudo ifcon˝g eth0  Select NAT and you are connected to the
+Internet. Check your IP address
+2 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+Figure 2: An important message to keep in mind, when conducting scanning and
+enumeration activities
+2 Finding Files and folders
+Objective of this activity
+Ethical hackers and malicious hackers use DirBuster and Dirb to discover hidden directories and
+˝les on web servers. These tools are essential for understanding web enumeration techniques,
+identifying potential security vulnerabilities, and recognising the importance of secure directory
+con˝gurations in web applications. By knowing what folders exist on a web server, you are able
+to identify servers, plugins , and tools used.
+How DirBuster and Dirb Tools Work
+‹ DirBuster is a combination of a crawler and brute-forcer. It follows all links on the pages
+it discovers and also tries di˙erent names for possible ˝les.
+‹ Dirb is similar to DirBuster but lacks a graphical user interface (GUI). It performs both
+crawling and brute-forcing, following links and trying di˙erent ˝le names.
+‹ To determine if a ˝le exists, DirBuster uses the server's response codes. The most common
+responses are as follows:
+ 200 OK: The ˝le exists and can be read by the user.
+ 404 File Not Found: The ˝le does not exist on the server.
+ 301 Moved Permanently: A redirect to another URL.
+ 401 Unauthorised: Authentication is required to access the ˝le.
+ 403 Forbidden: The request was valid, but the server refuses to respond.
+ 503 Service Unavailable: The server did not provide a response. This may be due
+to restrictions or because the server is down.
+DirBuster is a tool created to discover, by brute force, the existing ˝les and directories in a web
+server. We will use it in this activity to search for a speci˝c list of ˝les and directories. We will use a
+text ˝le that contains the list of words that we will ask DirBuster to look for.
+‹ Now open a terminal and type dirbuster
+ This will open dirbuster in graphical mode.
+ On the DirBuster's window, set the target URL to https://cwscenario.site:443
+Set the number of threads to 5
+For live website such as cwscenario, set the number to 5 otherwise you risk overwhelming
+the server! 360 student are taking this module!
+The number of threads refers to how many concurrent tasks the application will
+perform during its operation
+Please do not use a bigger number. This is on a live website and everyone on
+the module will be conducting this activity!
+3 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+ This activity will be monitored with the IP and user account access!
+Select List based brute force and click on Browse.
+list based brute force means brute force based on list provided by user.
+ In the browsing window, let's ˝rst try using the default wordlist before switching to the
+module repository one.
+ In the ˝le selection window for the list of directories and ˝les, click on Browse, navigate to
+the ˝le, and select it. We will ˝rst use one of DirBuster's default wordlist ˝les, located at:
+/usr/share/dirbuster/wordlists/directory-list-2.3-small.txt
+Uncheck the Be Recursive option.
+We are unchecking the Be Recursive option since we only want to perform scan on the
+˝rst level of directories and we don't want to scan subdirectories. otherwise this will take
+very long time!
+Click on Start.
+ Now click on the results tab to see what folders DirBuster has found. On the browser, try
+to see what contents those folders contain. Results reveal
+‹ Now, on kali, switch to "Host Only adapter" and start Disrbuster again
+ On the DirBuster's window, set the target URL to http://192.168.56.101:80
+Set the number of threads to 20
+Since you are conducting this scan on a local device, you can set the number to 20.
+ Select List based brute force and click on Browse.
+list based brute force means brute force based on list provided by user.
+ In the browsing window, select the ˝le (modulewordlist.lst) from the module repository.
+ Uncheck the Be Recursive option.
+Again, we are unchecking the Be Recursive option so that it doesn't take very long time!
+If you are running this from home, when you can wait, try to run it with the Be Recursive
+option
+ Click on Start.
+ If we go to the Results tab, we will see that DirBuster has found at least two of the ˝les
+in our dictionary: cgi-bin and phpmyadmin.
+‹ You can also use dirb tool. It works in a similar way to DirBuster but has no GUI.
+man dirb
+This will present you with the manual of the tool, including the options you can use and its
+syntax.
+dirb http://192.168.56.101
+This will start a basic scan on the IP address of the OWASP VM.
+dirb http://192.168.56.101 modulewordlist.lst
+This command starts a basic scan on the IP address of the OWASP VM using the modulewordlist.lst
+dictionary instead of the default one.
+ Note: If you encounter an error stating that the ˝le does not exist, it means Kali is being
+pointed to a ˝le that is not in the directory where the command is being run. This is the
+case for all commands in Linux, not only for the dirb command Below are three examples
+of how to handle this:
+* If you are in the directory containing the ˝le (moduleworldlist), Use the ˝lename
+directly
+4 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+dirb http://192.168.56.101 modulewordlist.lst
+* If you are in another directory, use the relative path, specifying the ˝le location
+relative to your current working directory. For example, if your current directory is
+/home/kali:
+dirb http://192.168.56.101 Desktop/modulewordlist.lst
+* Or, use the absolute path which provides the full path to the ˝le from the root
+directory (/):
+dirb http://192.168.56.101 /home/kali/Desktop/modulewordlist.lst
+dirb http://192.168.56.101 modulewordlist.lst -v
+You can add the verbose mode option -v to get a more detailed output.
+dirb http://192.168.56.101 modulewordlist.lst -o results.txt
+You can save the output in a ˝le using the -o option for later analysis. In this case we saved
+the output in a ˝le called results.txt.
+ Look at the manual to ˝nd the other options you can use to change how the command
+behaves and the output it presents.
+‹ Note: The tools we have used are not comprehensive and there are many others
+either pre - installed with Kali or available as open source. You are encouraged to
+explore those tools.
+‹ We will be using the module wordlist that you have downloaded in section.1.
+cd 6cosc019w
+If you are on Desktop, navigate to the folder you downloaded
+cd /home/Desktop/kali/6cosc019w
+To use the absolute path.
+3 Scanning activity
+One of the most important activities in the reconnaissance phase is gathering information through
+scanning and enumeration methods.
+Scanning objectives
+Ethical hackers and malicious hackers conduct scanning activities to identify vulnerabilities in
+networks and systems.
+‹ Ethical hackers use these scans to ˝nd weaknesses, assess security, and protect systems
+from exploitation.
+‹ Malicious hackers, on the other hand, use scanning to discover exploitable weaknesses in
+order to gain unauthorised access or disrupt services.
+‹ Scanning helps both groups understand the structure of a network, identify open ports,
+and detect potential entry points.
+PLEASE READ BEFORE YOU START THIS SECTION
+‹ We will be mainly using nmap however there are many other tools we can be used.
+For other tools pre-installed on Kali about OSINT, Information Gathering, and tools to
+enumerate networks ports and addresses, services and protocols, you click on Kali home
+button, and select → 01 - Information Gathering.
+5 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+Nmap is one of the most widely used port scanners in the world. It can identify live hosts, scan for
+open TCP and UDP ports, detect ˝rewalls, retrieve service versions on remote hosts, and even uncover
+and exploit vulnerabilities through the use of scripts.
+‹ We ˝rst need to see if the server is answering to a ping or if the host is up.
+nmap 192.168.56.101
+This is not what we wanted! At least at this stage, this command completed a port scan
+using TCP sync scan. while we only wanted to ping the device to see if it is live.
+man nmap
+According to the nmap help page (Fig.3), the default nmap scan will conduct a TCP sync and
+to disable ports scanning while pinging the IP address. we need to use the -sn option This is
+because the to disable ports scan while pinging the IP address to check if the IP address is live.
+Figure 3: Nmap manual - Disabling port scan
+‹ To check if the the IP address is responding and the server is ip
+nmap -sn 192.168.56.101
+ The OWASP server responded that it is up. If you don't get this, make sure you have
+OWASP is up and is on the host only network.
+In this command, with the -sn parameter, we instructed nmap to conduct a ping scan to
+check if the server was responding using ICMP.
+3.1 Identifying live hosts Nmap
+‹ In the previous section, we used nmap with the -sn and we have identi˝ed that the 192.168.56.101
+IP address is live and responding.
+‹ Let's begin the process of locating live hosts (active machines). We already know the OWASP
+machine IP address.
+nmap -sn 192.168.56.*
+Using the asterisk * instead of a speci˝c value tells Nmap to scan all hosts in this IP range
+(Fig.4).
+6 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+Figure 4: Network scan results for the scanning the network for active hosts. The host IP for the
+machine hosting the VM 192.168.56.1 The DHCP server IP address 192.168.56.100 The
+OWASP machine IP address 192.168.56.101 The Kali machine IP address 192.168.56.102
+We can also use 0/24 instead of the * for example nmap -sn 192.168.56.0/24 will instruct
+nmap to scan all hosts on the network 192.168.56.0 subnet 24. Note that in a real live
+network environment, you will ˝nd a lot more IP addresses
+3.2 TCP Scans
+‹ With the knowledge of the victim's network range and the active machines, we'll proceed with
+the port scanning process to retrieve the open TCP ports and access points.
+‹ Since these type of scans are using the TCP transport layer protocol, it leverages the three way
+handshakes that TCP uses. Depending on what we are looking for and how quiet or loud we
+need to be, we can instruct nmap to use one the various TCP scans methods below, from the
+quietest, to the loudest.
+1. TCP NULL scan- This is the quietest TCP scan. In this scan, nmap Sends a packet with
+no ˛ags set (Basically a TCP ˛ag that is not set to any of the TCP possible ˛ags SYN,
+ACK, RST, or FIN ). The goal is to see how the target system responds. If the port is open,
+there should be no response; if it's closed, an RST response will be sent.
+nmap -sn 192.168.56.101
+This is the same as the one we used before. The ICMP protocol in the network layer
+needs a transport layer protocol to deliver it is ICMP request. The n stands for null.
+2. TCP FIN Scan- This is a quiet TCP scan. In this scan, Nmap Sends a FIN ˛ag to close a
+connection that doesn't actually exist! In the case the server would respond with a ˝ltered
+open response meaning it is open but doesn't know how to respond to the request.
+nmap -sF 192.168.56.101
+The responses will indicate whether services are available and open on di˙erent ports.
+If a response is received, it means the port is open. The F stands for the FIN ˛ag.
+3. TCP SYN Scan- This TCP scan is moderately quiet. It is commonly referred to as
+half open because a full TCP connection is not established. This type of scan was
+originally developed to be stealthy and evade IDS systems, although most modern systems
+have adapted to detect it. Open ports reply with a SYN/ACK, whereas closed ports respond
+with an RST/ACK.
+nmap -sS 192.168.56.101
+This is also the default Nmap port scan. It is often su°cient to identify running services.
+The S stands for SYN scan.
+4. TCP ACK Scan- This is a moderately loud TCP scan. In this scan, nmap attempts
+to determine the ˝rewall access control list (ACL) rules or identify whether stateless
+inspection is being used. Stateless inspection is a method ˝rewalls use to inspect
+packets without looking at their contents.
+7 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+nmap -sA 192.168.56.101
+This scan does not directly check for open ports. Instead, it checks whether ports are
+˝ltered based on ˝rewall behaviour. You will notice that the results do not show any
+speci˝c open ports. However, the terms un˝ltered or ignored state indicate that the
+˝rewall is not blocking port requests. The F stands for the FIN ˛ag.
+TCP Connect Scan - This is the loudest TCP scan, but also the most reliable. It can
+be easily logged and detected because a full connection is established. Open ports respond
+with a SYN/ACK, while closed ports reply with an RST/ACK.
+nmap -sT 192.168.56.101
+As it completes the handshake and is very loud, it is usually used only if other scans
+did not provide enough information due to network restrictions, such as a ˝rewall. If
+other scans have provided su°cient information, this option is better avoided. The T
+stands for connecT.
+3.3 UDP scan
+‹ Up until this point, all of our scans have been for TCP ports. Some services and ports use UDP
+to communicate to the outside world such as NTP (port 123) and SNMP (port 161). To ˝nd
+these ports and services, we need to do a UDP scan. We can do this with the -sU option.
+If you have limited time, such as when in class, you can leave the command below and run it
+on your own environment when you have more time. While testing it took 28 minutes on my
+machine.
+nmap -sU 192.168.56.101
+ A UDP scan will take very long time and longer than TCP scans. This is because
+UDP is a connectionless protocol and the lack of the three way handshake makes it resource
+intensive as it goes through each port and no need for acknowledgment regardless whether
+it is used or not while TCP scans skips any port that does not respond.
+4 Enumeration
+Scanning objectives
+‹ Enumeration is a phase in the information-gathering process during cybersecurity
+assessments.
+‹ It involves extracting detailed information about a target system or network to understand
+its con˝guration, services, and potential vulnerabilities.
+‹ The goal of enumeration is to create a comprehensive pro˝le of the target, aiding in the
+identi˝cation of security weaknesses.
+‹ This includes identifying version of servers, services and and operating systems the target
+uses.
+4.1 Enumeration for Operating systems
+‹ At this point of the information gathering process, we should now have documented a list of IP
+addresses, active machines, and open ports identi˝ed from the target organization. The next
+step in the process is determining the running operating system of the active machines in order
+to know the type of systems we're pen-testing.
+ The next step is to try to identify the Operating System (OS) the server is using. we
+issue the following command with the -O option to enable the OS detection feature.
+8 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+Figure 5: Operating System enumeration results on the OWASP VM.
+Figure 6: Version Detection for OWASP. As you can see, we now know in addition to the port details,
+the version of the service running behind the port.
+nmap -O 192.168.56.101
+The -O option will compare the ˝ngerprint response of the server with nmap database of
+OS ˝ngerprints. it if ˝nd a similar ˝ngerprint, it highlight as a match.
+In this case, nmap returned a family of OS match Kernel 2.6.X with possibles version
+between 2.6.17 to 2.6.36 (Fig.5).
+It can also return an OS exact match for example Linux Kernel 2.6.14 or a partial match
+for example 2.x or 3.x Linux kernel or returns no match at all .
+This is a very noisy command and an Intrusion detection system such as a ˝rewall will pick
+it up.
+4.2 Enumeration for services
+‹ Determining the services running on speci˝c ports will ensure a successful pentest on the target
+network. It will also remove any doubts left resulting from the OS ˝ngerprinting process.
+ We will need conduct services enumeration by attempting to detect services running on the
+OWASP machine using the -sV option.
+nmap -sV 192.168.56.101
+The Versions detection (also called Versions ˝ngerprinting) option-sV will return the services
+running on the system and their version.
+What can we do with enumeration information?
+When conducting enumeration for services, we are able to ˝nd speci˝c versions for services and
+Operating systems running on our target. We can then look for known vulnerabilities that exist
+for those services. we can use any Common Vulnerabilities and Exposures database to
+search for such vulnerabilities.
+Even a google search will reveal vulnerabilities for services. Try it now! while connected to the
+Internet, open a browser and search for "Openssh 5.3 p1 cve vulnerabilities" see what comes up.
+5 Options
+‹ Before we continue with nmap and look at more advanced methods to use it, we need to look
+at some of the options that gives nmap its strength and makes it the most popular information
+gathering tool
+9 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+Figure 7: scanlist ˝le with two IP addresses
+5.1 List of targets
+‹ Many times we want to scan a list of IP addresses and not an entire subnet. In any case In a
+real life scenario, you would ˝nd many IP addresses in an environment.
+‹ We can use any text editor and create a list of IP addresses and "feed" it to nmap. This is the
+list of IP addresses that you want to scan. You can either use mousepad, the GUI based text
+editor in Kali or you can use nano terminal based text editor.
+mousepad scanlist.txt
+or
+nano scanlist.txt
+Both commands will create the ˝le once you save it after editing.
+Add in the ˝le as many IP as you need.
+ For example you can put the OWASP and the KALI IPs, each on it's own line (Fig.7).
+ Once you save the ˝le, assuming you are in the same folder (use the absolute path if you
+are not in the same folder), you can scan using the -iL option to provide the name of the
+IP addresses ˝le.
+nmap -iL scanlist.txt
+ This will scan both IP addresses in the scanlist ˝le.
+5.2 Spoof or Decoy Scan!
+‹ When we are scanning machines that are not ours, we often want to hide our IP (our identity)
+however we still need to ensure that packets contain our source address otherwise the response
+from the target system will not know where to return to.
+‹ If we spoof our IP address in nmap, the victim ip will respond to the spoofed ip, and not us. Not
+very useful, if we are scanning for info gathering.
+ A better solution is to obfuscate our IP address by using the -D option. Nmap allows us to
+use decoy IP addresses so that it looks like many IP addresses are scanning the target.
+sudo nmap -sS 192.168.56.101 -D 10.0.0.1,10.0.0.2,10.0.0.4
+‹ Note-It is worth noting that this option doesn't really hide your IP but bury the IP address
+among many IP addresses so that the network/security admin can't pinpoint the source of
+the scan. Hackers and Pentesters usually use proxies for full anonymity. One proxy that is
+pre-installed on Kali called proxychains can be used to hide your identity completely when in
+NAT.
+5.3 Speci˝c Ports
+‹ In most times, specially when you are looking or conducting enumeration on certain services, you
+want to look for speci˝c ports rather than scan the full range .
+10 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+‹ The -p option allows us to instruct nmap to scan speci˝c ports, or a speci˝c range of ports.
+ We can explicitly specify which port to scan on for either a speci˝c host or the whole
+network.
+nmap -p 22 192.168.56.101
+This command will scan port 22 for SSH service on a speci˝c host, in this case the OWASP
+machine.
+nmap -p 22 192.168.56.*
+This will scan port 22 on the whole network range (particularly live hosts will respond)
+machine and we can identify which live host is using SSH.
+nmap -p 1-1000 192.168.56.101
+ This command will explicitly specify instructs nmap to scan ports between two values rather
+than one value or the full range, in this case ports between and 1000 (the ˝rst 1000 ports).
+nmap -p 80,443 192.168.56.101
+This will scan the two ports used by the HTTP servers port 80 and port 443.
+5.4 Reason
+‹ The reason option instructs nmap to return the reason why it has placed a particular port in a
+particular state.
+‹ This is useful when you obtain incomplete information about a port and you want more information.
+nmap --reason 192.168.56.101
+ This will provide us with more information about the port state and why it was reported
+in this state.
+ In this case (Fig.8), we can see that Nmap reported that the open port state is due to the
+response from OWASP to the syn message with an Ack message.
+.
+Figure 8: Default Nmap scan with reason option return the full three way-handshake as the reason
+for open state port.
+5.5 Merging Options
+‹ We can merge options in Nmap, for example we can conduct enumeration for both services and
+the operating system at the same time.
+11 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+nmap -sV -O 192.168.56.101
+-sV instructs nmap to use version detection to detect the version of the service running
+behind a port.
+-O tells Nmap to try to guess the operating system running on the target using the information
+collected from open ports and versions
+‹ Another example of merging options that is speci˝cally useful is to use the --reason option
+when conducting UDP scans.
+‹ Because UDP does not acknowledge receipt of packets, we wouldn't not know the reason for a
+state reported by nmap.
+‹ In the output from the UDP scan above, we noted that some ports were reported as open/˝ltered.
+This meant that we couldn't determine whether the port is open or it is ˝ltered by a device such
+as a ˝rewall.
+nmap -sU --reason 192.168.56.101
+Nmap returned the same results, but it gave us the reason of the particular state of the
+port.
+5.6 Output
+‹ Sometimes, you need to save the output of the scan result to use later.
+‹ Nmap allow users to save the output in di˙erent formats (-oN normal output, -oX XML ˝le,
+-oG Grepable ˝le, -oJ Json ˝le, and others).
+nmap -p 22 192.168.56.* -oG ∼/Desktop/myresults.txt
+ This will instruct Nmap to save the ˝le in Grepable format on Desktop in a ˝le called
+myresults.txt. I ˝nd the grepable format the most useful as it makes the format easily
+formatted to ˝lter using command lines. You can try other formats.
+ Note-The symbol ∼ means the home directory. This is the same as navigating to /home/kali.
+Kali is the username in this case.
+5.7 Nmap scripting Engine (NSE)
+‹ In addition the scanning and enumeration methods we have used before, nmap o˙ers through its
+Nmap Scripting Engine (NSE) more ˛exibility as it allows us to run more sophisticated scans
+by using the Engine, which is basically a large collection of scripts written for speci˝c purposes.
+‹ On Kali Linux, Nmap Scripting Engine (NSE) scripts are installed in the default directory where
+Nmap is installed, which is /usr/share/nmap/scripts/.
+ls /usr/share/nmap/scripts
+ Listing the scripts ˝les in the folder reveals a large number of pre installed scripts (607 at
+the time of writing!).
+From the scripts names you can see that the scripts, are not only for scanning, discover,
+enumeration and vulnerability detection but some can also be used to conduct DoS and
+brute force attacks or even exploitation of certain vulnerabilities.
+The Nmap NSE also allows users to write their own scripts and share these scripts with
+other users for the purposes of networking, reconnaissance, and other activities.
+12 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+6 Using NSE for enumeration
+6.1 Apache server enumeration
+‹ Although we have identi˝ed previously versions of services running, NSE scripts in most cases
+provides more information about the versions.
+‹ We have already identi˝ed that Apache HTTPd 2.2.14 is running on port 80 and port 443. Let
+us try to get some more information about this.
+ We will use a script called banner. This script captures information about the service such
+as the version but with more information.
+nmap -sV --script banner -p 80,443 192.168.56.101
+This command instructed nmap to conduct version detection and providing detailed banner
+about the services running.
+ You can see that nmap provided a lot more information about the apache server running
+including the di˙erent modules that are enabled within the Apache service. Each can
+possibly be vulnerable and provides a point of entry!
+ There are several other NSE scripts related to the Apache server you can explore. In
+particular, try these scripts:
+* http-title, http-headers and http-sitemap-generator
+* For example:
+nmap --script http-headers -p 80,443 192.168.56.101
+ Check the scripts folder.
+ls /usr/share/nmap/scripts/http*
+* This will show all the scripts relevant to the Apache server HTTP service.
+6.2 Other services enumeration
+‹ We have found many services runing on the OWASP machine through our initial scans. We can
+look for Nmap scripts for those services.
+‹ SSH service on port 22
+ls /usr/share/nmap/scripts/ssh*
+ This will show all the scripts relevant to the SSH service.
+Note that ssh-brute will conduct Brute force on the OWASP machine. Doing this at this
+stage will risk being detected.
+nmap --script ssh2-enum-algos -p 22 192.168.56.101
+This will enumerate the SSH certi˝cates including the algorithms used for this SSH certi˝cate.
+This can be of interest as you might ˝nd that the ssh certi˝cate is using old and vulnerable
+algorithms.
+nmap --script ssh-auth-methods -p 22 192.168.56.101
+ While this script will enumerate the authentication method, revealing information about
+the authentication methods supported by the server.
+‹ A hacker or a pentester would spend a long time enumerating all services found on the system.
+13 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+Figure 9: Samba service users enumeration
+7 Other scanning and enumeration tools
+‹ While we focused on Nmap in this lab as it is the most popular tool and is the most widely used,
+it is not the only port scanner available.
+‹ There are some other alternatives included in Kali Linux. We present some examples below.
+There are many others you can explore.
+ One in particular that is interesting in how it represents the ARP table and discover devices
+is Netdiscover but there are others pre-installed on Kali
+ Netdiscover uses the ARP table to discover devices by sni°ng ARP requests and Responses.
+sudo netdiscover -i eth0 -r 192.168.56.0/24
+The -i eth0 means that we are simply sni°ng on a speci˝c network using interface eth0.
+‹ There are several scanners and mapper tools that have a graphical interface. Zenmap is a popular
+GUI alternative to nmap.
+zenmap
+Zenmap execute Nmap commands in the background and presents them in GUI mode.
+8 Samba enumeration
+Why Samba enumeration?
+OWASP initial scans, revealed that port 445 is open and Samba service is running(Fig.6). Samba
+is a service that allows users to share folders, printers and other resources both on Windows
+and Linux. If samba is not con˝gured properly, the enumeration can reveal large amount of
+information.
+‹ Let's see what we information we can get from enumeration the Samba service.
+‹ The enum4linux tools is designed spe˝cially to conduct samba service enumeration.
+enum4linux -h
+ This will show the help page of the tool including the various options we can use.
+enum4linux -U 192.168.56.101
+This will enumerate users on the OWASP machine. This command will ˝nd three users,
+including the one we already know about (Fig.9).
+enum4linux -M 192.168.56.101
+This will get the machine information list
+enum4linux -S 192.168.56.101
+This will attempt to map shared folders using default passwords but will get denied access
+enum4linux -P 192.168.56.101
+This will reveal the password policy (length, complexity, etc.)
+14 ©University of Westminster 2025
+Scanning and Enumeration 6COSC019W
+enum4linux -G 192.168.56.101
+This will reveal the group membership and the domains users belong to.
+enum4linux -a 192.168.56.101
+This will reveal information about user accounts, shares, groups, password policy, etc.
+enum4linux -u root -p owaspbwa 192.168.56.101
+We map shared folders using the username and password we already know. It reveals many
+services that we did not know are running such as the Messenger service.
+A note on samba enumeration
+We could have used the Nmap smb scripts but the enum4linux command is more focused and
+its output is easier to read.
+ls /usr/share/nmap/scripts/smb*
+This is the end of the lab, and we only covered a few of the usual activities that
+take place during the scanning and enumeration phase. As you can see, the more
+in-depth the analysis is, the more valuable information a hacker or penetration
+tester can uncover, which can be used to exploit target machines.
+15 ©University of Westminster 2025
